@@ -8,4 +8,7 @@ const (
 	STRING
 	COLON
 	COMMA
+	NUM
+	BOOL
+	NULL
 )

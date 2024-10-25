@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
+	"strconv"
+	"strings"
 )
 
 type Token struct {
@@ -32,7 +35,7 @@ func (s *Stack) PeekBack(steps int) Token {
 }
 
 func main() {
-	file, err := os.Open("./tests/step2/invalid2.json")
+	file, err := os.Open("./tests/step3/invalid.json")
 
 	if err != nil {
 		fmt.Println("error opening valid file in step 1")
@@ -60,11 +63,18 @@ func createToken(char string, token TokenType) Token {
 func scan(f *os.File) []Token {
 	var tokens []Token;
 
-	scanner := bufio.NewScanner(f)
-	scanner.Split(bufio.ScanBytes)
+	reader := bufio.NewReader(f)
+	// scanner.Split(bufio.ScanBytes)
 
-	for scanner.Scan() {
-		char := scanner.Text()
+	for {
+		byte, err := reader.ReadByte();
+
+		if err != nil {
+			break;
+		}
+
+		char := string(byte);
+
 		switch char {
 			case "{":
 				tokens = append(tokens, createToken(char, RBRACE));
@@ -73,8 +83,16 @@ func scan(f *os.File) []Token {
 			case "\"":
 				// continue scanning until you reach the corresponding "
 				literal := "";
-				for scanner.Scan() {
-					c := scanner.Text();
+				for {
+					b, err := reader.ReadByte();
+
+					if err != nil {
+						fmt.Println("encountered error: ", err);
+						os.Exit(1);
+					}
+
+					c := string(b);
+
 					if c == "\"" {
 						break;
 					}
@@ -82,6 +100,44 @@ func scan(f *os.File) []Token {
 				}
 
 				tokens = append(tokens, createToken(literal, STRING));
+			// booleans
+			case "t", "f":
+				literal := char;
+
+				for {
+					b, _ := reader.ReadByte();
+					c := string(b);
+					literal += c
+
+					if strings.Contains("true", literal) || strings.Contains("false", literal) {
+						if literal == "true" || literal == "false" {
+							tokens = append(tokens, createToken(literal, BOOL));
+							break;
+						}
+					} else {
+						fmt.Printf("Err: unknown token '%s'\n", literal);
+						os.Exit(1);
+					}
+				}
+			// null
+			case "n":
+				literal := char;
+
+				for {
+					b, _ := reader.ReadByte();
+					c := string(b);
+					literal += c
+
+					if strings.Contains("null", literal) {
+						if literal == "null" {
+							tokens = append(tokens, createToken(literal, NULL));
+							break;
+						}
+					} else {
+						fmt.Printf("Err: unknown token '%s'\n", literal);
+						os.Exit(1);
+					}
+				}
 			case ":":
 				tokens = append(tokens, createToken(char, COLON));
 			case ",":
@@ -89,8 +145,37 @@ func scan(f *os.File) []Token {
 			case " ", "\n":
 				// keep going, dont care about spaces or newline characters (yet?)
 			default:
-				fmt.Printf("Err: unknown token '%s'\n", char);
-				os.Exit(1);
+				// numbers
+				_, err := strconv.Atoi(char);
+				createdNumericToken := false;
+
+				if err != nil {
+					fmt.Printf("Err: unknown token '%s'\n", char);
+					os.Exit(1);
+				}
+
+				literal := char;
+				for {
+					b, _ := reader.Peek(1);
+					c := string(b);
+					_, err := strconv.Atoi(c);
+
+					if err != nil {
+						tokens = append(tokens, createToken(literal, NUM));
+						createdNumericToken = true;
+						break;
+					} else {
+						bb, _ := reader.ReadByte();
+						cc := string(bb);
+
+						literal += cc;
+					}
+				}
+
+				if !createdNumericToken {
+					fmt.Printf("Err: unknown token '%s'\n", char);
+					os.Exit(1);
+				}
 		}
 	}
 
@@ -105,6 +190,8 @@ func isValidJSON(tokens []Token) bool {
 	}
 
 	valid := true;
+	validValues := []TokenType{STRING, NUM, BOOL, NULL}
+
 	for i := 0; i < len(tokens); i ++ {
 		token := tokens[i];
 
@@ -114,7 +201,7 @@ func isValidJSON(tokens []Token) bool {
 			// left brace only appears as last token
 			peekedValue := s.PeekBack(1);
 
-			if peekedValue.token != STRING && peekedValue.token != RBRACE {
+			if !slices.Contains(validValues, peekedValue.token) {
 				valid = false;
 				break;
 			}
@@ -132,6 +219,15 @@ func isValidJSON(tokens []Token) bool {
 				} else {
 					s.Push(token);
 				}
+			}
+		} else if (token.token == BOOL || token.token == NULL || token.token == NUM) {
+			peekedValue := s.PeekBack(1);
+
+			if peekedValue.token != COLON {
+				valid = false;
+				break;
+			} else {
+				s.Push(token);
 			}
 		}  else {
 			s.Push(token);
