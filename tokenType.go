@@ -11,4 +11,6 @@ const (
 	NUM
 	BOOL
 	NULL
+	LBRACKET
+	RBRACKET
 )

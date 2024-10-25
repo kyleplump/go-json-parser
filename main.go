@@ -35,7 +35,7 @@ func (s *Stack) PeekBack(steps int) Token {
 }
 
 func main() {
-	file, err := os.Open("./tests/step3/invalid.json")
+	file, err := os.Open("./tests/step4/invalid.json")
 
 	if err != nil {
 		fmt.Println("error opening valid file in step 1")
@@ -142,6 +142,10 @@ func scan(f *os.File) []Token {
 				tokens = append(tokens, createToken(char, COLON));
 			case ",":
 				tokens = append(tokens, createToken(char, COMMA));
+			case "[":
+				tokens = append(tokens, createToken(char, LBRACKET));
+			case "]":
+				tokens = append(tokens, createToken(char, RBRACKET));
 			case " ", "\n":
 				// keep going, dont care about spaces or newline characters (yet?)
 			default:
@@ -190,7 +194,7 @@ func isValidJSON(tokens []Token) bool {
 	}
 
 	valid := true;
-	validValues := []TokenType{STRING, NUM, BOOL, NULL}
+	validValues := []TokenType{STRING, NUM, BOOL, NULL, RBRACKET, RBRACE}
 
 	for i := 0; i < len(tokens); i ++ {
 		token := tokens[i];
@@ -204,6 +208,8 @@ func isValidJSON(tokens []Token) bool {
 			if !slices.Contains(validValues, peekedValue.token) {
 				valid = false;
 				break;
+			} else {
+				s.Push(token);
 			}
 		} else if token.token == STRING {
 			peekedValue := s.PeekBack(1);
@@ -229,7 +235,7 @@ func isValidJSON(tokens []Token) bool {
 			} else {
 				s.Push(token);
 			}
-		}  else {
+		} else {
 			s.Push(token);
 		}
 	}
