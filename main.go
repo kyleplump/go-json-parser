@@ -26,14 +26,22 @@ func (s *Stack) Pop() Token {
 	return lastItem[0];
 }
 
+func (s *Stack) PeekBack(steps int) Token {
+	lastItem := s.items[len(s.items)-steps:];
+	return lastItem[0];
+}
+
 func main() {
-	file, err := os.Open("./tests/step1/valid.json")
+	file, err := os.Open("./tests/step2/invalid2.json")
 
 	if err != nil {
 		fmt.Println("error opening valid file in step 1")
 	}
 
 	tokens := scan(file);
+
+	fmt.Println("tokens: ", tokens);
+
 	valid := isValidJSON(tokens);
 
 	fmt.Println("is valid json?:", valid);
@@ -62,6 +70,27 @@ func scan(f *os.File) []Token {
 				tokens = append(tokens, createToken(char, RBRACE));
 			case "}":
 				tokens = append(tokens, createToken(char, LBRACE));
+			case "\"":
+				// continue scanning until you reach the corresponding "
+				literal := "";
+				for scanner.Scan() {
+					c := scanner.Text();
+					if c == "\"" {
+						break;
+					}
+					literal += c;
+				}
+
+				tokens = append(tokens, createToken(literal, STRING));
+			case ":":
+				tokens = append(tokens, createToken(char, COLON));
+			case ",":
+				tokens = append(tokens, createToken(char, COMMA));
+			case " ", "\n":
+				// keep going, dont care about spaces or newline characters (yet?)
+			default:
+				fmt.Printf("Err: unknown token '%s'\n", char);
+				os.Exit(1);
 		}
 	}
 
@@ -80,18 +109,33 @@ func isValidJSON(tokens []Token) bool {
 		token := tokens[i];
 
 		if token.token == LBRACE {
-			corresponding := s.Pop();
+			// not handling nested objects yet
 
-			if corresponding.token != RBRACE {
+			// left brace only appears as last token
+			peekedValue := s.PeekBack(1);
+
+			if peekedValue.token != STRING && peekedValue.token != RBRACE {
 				valid = false;
+				break;
 			}
-		} else {
+		} else if token.token == STRING {
+			peekedValue := s.PeekBack(1);
+
+			if peekedValue.token == RBRACE || peekedValue.token == COMMA {
+				s.Push(token);
+			} else if peekedValue.token == COLON {
+				// its a string value
+				key := s.PeekBack(2);
+
+				if key.token != STRING {
+					valid = false;
+				} else {
+					s.Push(token);
+				}
+			}
+		}  else {
 			s.Push(token);
 		}
-	}
-
-	if len(s.items) > 0 {
-		return false;
 	}
 
 	return valid;
